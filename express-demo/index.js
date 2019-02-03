@@ -1,69 +1,36 @@
 
+const debug = require('debug')('rnd:startup');
+const config = require('config');
+const morgan = require('morgan');
+const helmet = require('helmet');
 const Joi = require('joi');
+const logger = require('./middleware/logger');
+const auth = require('./middleware/auth');
+const customers = require('./routes/customers');
+const home = require('./routes/home');
 const express = require('express');
 
 const app = express();
 
+app.set('view engine', 'pug');
 app.use(express.json());
+app.use(helmet());
 
-const customers = [
-    {id:1, name:'FOX'},
-    {id:2, name:'SDVI'},
-    {id:3, name:'Evertz'},
-]
+console.log(`Application Name: ${config.get('name')}`);
+console.log(`Mail Server: ${config.get('mail.host')}`);
+console.log(`Mail Password: ${config.get('mail.password')}`);
 
-app.get('/', (req, res) => {
-    res.send("This is the home page of my express app...");
-});
+if (app.get('env') == 'development') {
+    app.use(morgan('tiny'));
+    debug('Morgan enabled.....................');
+}
 
-app.get('/api/customers', (req, res) => {
-    res.send(customers);
-});
+app.use(logger);
+app.use(auth);
+app.use('/', home);
+app.use('/api/customers', customers);
 
-app.get('/api/customers/:id', (req, res) => {
-    const customer = customers.find(c => c.id === parseInt(req.params.id));
-    if(!customer) return res.status(404).send('Resource not found...');
-    res.send(customer);
-});
-
-app.post('/api/customers/', (req, res) => {
-    const { error } = validateCustomer(req.body);
-    if (error) return res.status(400).send(error.details[0].message);
-
-    const customer = {id: customers.length + 1, name: req.body.name};
-    customers.push(customer);
-    console.log(customers);
-    res.send(customer);
-});
-
-app.put('/api/customers/:id', (req, res) => {
-    const customer = customers.find(c => c.id === parseInt(req.params.id));
-    if(!customer) return res.status(404).send('Resource not found...');
-
-    const { error } = validateCustomer(req.body);
-    if (error) return res.status(400).send(error.details[0].message);
-
-    customer.name = req.body.name;
-    res.send(customer);
-});
-
-app.delete('/api/customers/:id', (req, res) => {
-    const customer = customers.find(c => c.id === parseInt(req.params.id));
-    if(!customer) return res.status(404).send('Resource not found...');
-
-    const index = customers.indexOf(customer);
-    customers.splice(index, 1);
-    res.send(customer);
-});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`listening on port ${port}...`));
 
-function validateCustomer(customer) {
-    const schema = { 
-        'name': Joi.string().min(3).required()
-    }  
-    
-    return Joi.validate(customer, schema);
-
-}
